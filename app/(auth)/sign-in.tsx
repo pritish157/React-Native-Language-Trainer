@@ -152,7 +152,7 @@ export default function SignInScreen() {
           {/* ── Footer Link ───────────────────────────────── */}
           <View className="flex-row justify-center pb-4">
             <Text className="text-style--body-md text-text-secondary">
-              Don't have an account?{" "}
+              {"Don't have an account? "}
             </Text>
             <Pressable onPress={() => router.replace("/(auth)/sign-up")}>
               <Text className="text-[14px] font-poppins-bold text-lingua-purple">

@@ -104,7 +104,7 @@ export default function VerificationModal({
 
           {/* Subtitle */}
           <Text className="text-style--body-md text-text-secondary text-center mb-8">
-            We've sent a verification code to{"\n"}
+            {"We've sent a verification code to\n"}
             {email ? (
               <Text className="font-poppins-semibold text-text-primary">
                 {email}
@@ -149,7 +149,7 @@ export default function VerificationModal({
           {/* Resend link */}
           <View className="flex-row justify-center">
             <Text className="text-style--body-md text-text-secondary">
-              Didn't receive the code?{" "}
+              {"Didn't receive the code? "}
             </Text>
             <Pressable onPress={handleResend}>
               <Text className="text-[14px] font-poppins-semibold text-lingua-purple">

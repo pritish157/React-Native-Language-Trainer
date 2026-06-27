@@ -36,7 +36,7 @@ export default function ForgotPasswordScreen() {
           {/* ── Header ────────────────────────────────────── */}
           <Text className="text-style--h1 mb-1">Forgot password?</Text>
           <Text className="text-style--body-md text-text-secondary">
-            No worries, we'll send you a reset code ✨
+            {"No worries, we'll send you a reset code ✨"}
           </Text>
 
           {/* ── Mascot ────────────────────────────────────── */}
