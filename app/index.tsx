@@ -102,7 +102,7 @@ export default function OnboardingScreen() {
         <View className="pb-8 pt-4">
           <Pressable
             onPress={() => {
-              // TODO: Navigate to auth or language selection
+              router.push("/(auth)/sign-up");
             }}
             className="bg-lingua-purple rounded-2xl py-5 flex-row items-center justify-center"
             style={({ pressed }) => ({

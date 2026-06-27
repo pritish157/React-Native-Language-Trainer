@@ -140,3 +140,42 @@
   font-family: "Poppins-Regular";
   color: #6B7280;
 }
+
+/* ─────────────────────────────────────────────────────────
+   BEM Auth Utility Classes
+   ───────────────────────────────────────────────────────── */
+
+@utility auth-input {
+  border-width: 1px;
+  border-color: #E5E7EB;
+  border-radius: 16px;
+  padding-left: 20px;
+  padding-right: 20px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  background-color: #FFFFFF;
+}
+
+@utility auth-social-btn {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  border-color: #E5E7EB;
+  border-radius: 16px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+  background-color: #FFFFFF;
+}
+
+@utility auth-divider {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+@utility auth-divider-line {
+  flex: 1;
+  height: 1px;
+  background-color: #E5E7EB;
+}
