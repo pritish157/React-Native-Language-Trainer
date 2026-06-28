@@ -1,19 +1,37 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, Image, ScrollView } from "react-native";
+import { View, Text, TextInput, Pressable, Image, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { images } from "@/constants/images";
+import { useSignIn } from "@clerk/expo/legacy";
 import VerificationModal from "@/components/VerificationModal";
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const { isLoaded, signIn } = useSignIn();
   const [email, setEmail] = useState("");
   const [showVerification, setShowVerification] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSendCode = () => {
-    // TODO: Integrate with Clerk forgot password
-    setShowVerification(true);
+  const handleSendCode = async () => {
+    if (!isLoaded) return;
+    if (!email) {
+      Alert.alert("Error", "Please enter your email address.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await signIn.create({
+        strategy: "reset_password_email_code",
+        identifier: email,
+      });
+      setShowVerification(true);
+    } catch (err: any) {
+      Alert.alert("Error", err.errors?.[0]?.message || err.message || "Failed to send reset code.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,9 +91,10 @@ export default function ForgotPasswordScreen() {
           {/* ── Send Code Button ──────────────────────────── */}
           <Pressable
             onPress={handleSendCode}
+            disabled={loading}
             className="bg-lingua-purple rounded-2xl py-4 items-center mb-6"
             style={({ pressed }) => ({
-              opacity: pressed ? 0.9 : 1,
+              opacity: (pressed || loading) ? 0.7 : 1,
               shadowColor: "#6C4EF5",
               shadowOffset: { width: 0, height: 6 },
               shadowOpacity: 0.35,
@@ -84,7 +103,7 @@ export default function ForgotPasswordScreen() {
             })}
           >
             <Text className="text-[18px] font-poppins-bold text-white">
-              Send Code
+              {loading ? "Sending..." : "Send Code"}
             </Text>
           </Pressable>
 
@@ -107,6 +126,7 @@ export default function ForgotPasswordScreen() {
         visible={showVerification}
         onClose={() => setShowVerification(false)}
         email={email}
+        flow="reset-password"
       />
     </SafeAreaView>
   );

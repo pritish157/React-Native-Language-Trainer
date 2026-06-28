@@ -1,10 +1,77 @@
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Text, Pressable, Image, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { images } from "@/constants/images";
+import { useAuth, useUser } from "@clerk/expo";
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
+
+  if (isSignedIn) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+        <View className="flex-1 px-6 justify-center items-center">
+          {/* Logo */}
+          <View className="flex-row items-center gap-2 mb-6">
+            <Image
+              source={images.mascotLogo}
+              className="w-12 h-12"
+              resizeMode="contain"
+            />
+            <Text className="text-[32px] font-poppins-bold text-text-primary">
+              muolingo
+            </Text>
+          </View>
+
+          {/* Mascot Happy */}
+          <Image
+            source={images.mascotWelcome}
+            className="w-56 h-56 mb-6"
+            resizeMode="contain"
+          />
+
+          {/* User info */}
+          <Text className="text-style--h2 mb-2 text-center">Welcome back!</Text>
+          <Text className="text-style--body-md text-text-secondary mb-8 text-center">
+            Signed in as:{"\n"}
+            <Text className="font-poppins-semibold text-text-primary">
+              {user?.emailAddresses[0]?.emailAddress || "User"}
+            </Text>
+          </Text>
+
+          {/* Actions */}
+          <View className="w-full gap-4">
+            <Pressable
+              onPress={() => Alert.alert("Coming Soon", "Lessons dashboard is currently under development.")}
+              className="bg-lingua-purple rounded-2xl py-4 items-center"
+              style={{
+                shadowColor: "#6C4EF5",
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.25,
+                shadowRadius: 10,
+                elevation: 6,
+              }}
+            >
+              <Text className="text-[18px] font-poppins-bold text-white">
+                Go to Lessons
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => signOut()}
+              className="border border-error rounded-2xl py-4 items-center"
+            >
+              <Text className="text-[18px] font-poppins-bold text-error">
+                Sign Out
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
