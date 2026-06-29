@@ -16,6 +16,13 @@ export const units: Unit[] = [
     title: "At the Restaurant",
     description: "Order food and drinks, ask for the check, and talk about dining preferences.",
   },
+  {
+    id: "es-unit-3",
+    languageId: "es",
+    number: 3,
+    title: "At the Café",
+    description: "Order coffee, practice social conversations, and learn basic directions.",
+  },
 
   // ── French Units ───────────────────────────────────────────
   {

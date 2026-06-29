@@ -30,13 +30,27 @@ export default function HomeScreen() {
   }, [currentLanguage]);
 
   const currentUnit = useMemo(() => {
-    return languageUnits[0] || {
-      id: "es-unit-1",
-      number: 1,
-      title: "Greetings & Basics",
-      description: "",
-    };
-  }, [languageUnits]);
+    if (languageUnits.length === 0) {
+      return {
+        id: "es-unit-1",
+        number: 1,
+        title: "Greetings & Basics",
+        description: "",
+      };
+    }
+    
+    // Find the first unit with incomplete lessons
+    for (const unit of languageUnits) {
+      const unitLessons = lessons.filter((l) => l.unitId === unit.id);
+      const allCompleted = unitLessons.length > 0 && unitLessons.every((l) => completedLessonIds.includes(l.id));
+      if (!allCompleted) {
+        return unit;
+      }
+    }
+    
+    // If all units completed, default to the last one
+    return languageUnits[languageUnits.length - 1];
+  }, [languageUnits, completedLessonIds]);
 
   // Find lessons for this unit
   const unitLessons = useMemo(() => {
@@ -261,7 +275,10 @@ export default function HomeScreen() {
               <Pressable
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  router.push("/(tabs)/learn");
+                  router.push({
+                    pathname: "/(tabs)/learn",
+                    params: { unitId: currentUnit.id },
+                  });
                 }}
                 className="bg-white rounded-2xl py-2 px-5 self-start active:opacity-90"
                 style={styles.shadowSm}
@@ -286,7 +303,10 @@ export default function HomeScreen() {
             <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/(tabs)/learn");
+                router.push({
+                  pathname: "/(tabs)/learn",
+                  params: { unitId: currentUnit.id },
+                });
               }}
               className="active:opacity-75"
             >

@@ -17,7 +17,7 @@ export const useProgressStore = create<ProgressState>()(
     (set) => ({
       xp: 15,
       streak: 12,
-      completedLessonIds: ["es-u1-l1"], // Seed with first Spanish lesson completed to match mockup
+      completedLessonIds: ["es-u1-l1", "es-u3-l1", "es-u3-l2"], // Seed with first Spanish lesson and Unit 3 lessons completed to match mockup
 
       addXp: (amount) => set((state) => ({ xp: state.xp + amount })),
       setStreak: (amount) => set({ streak: amount }),
