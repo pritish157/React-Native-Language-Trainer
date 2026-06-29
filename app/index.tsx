@@ -1,15 +1,31 @@
+import { useEffect } from "react";
 import { View, Text, Pressable, Image, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { images } from "@/constants/images";
 import { useAuth, useUser } from "@clerk/expo";
+import { useLanguageStore } from "@/store/useLanguageStore";
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
+  const { selectedLanguageId, setSelectedLanguageId, hasHydrated } = useLanguageStore();
+
+  useEffect(() => {
+    if (hasHydrated && isSignedIn) {
+      if (!selectedLanguageId) {
+        router.replace("/language-select");
+      } else {
+        router.replace("/(tabs)" as any);
+      }
+    }
+  }, [hasHydrated, isSignedIn, selectedLanguageId, router]);
 
   if (isSignedIn) {
+    if (selectedLanguageId) {
+      return null;
+    }
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
         <View className="flex-1 px-6 justify-center items-center">
@@ -74,6 +90,21 @@ export default function OnboardingScreen() {
             >
               <Text className="text-[18px] font-poppins-bold text-error">
                 Sign Out
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setSelectedLanguageId(null);
+                Alert.alert(
+                  "Storage Cleared",
+                  "Selected language has been cleared from AsyncStorage."
+                );
+              }}
+              className="border border-[#E5E7EB] rounded-2xl py-4 items-center bg-[#F6F7FB]"
+            >
+              <Text className="text-[18px] font-poppins-bold text-text-secondary">
+                Clear Storage (Test)
               </Text>
             </Pressable>
           </View>

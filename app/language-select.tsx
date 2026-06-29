@@ -14,17 +14,20 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { languages } from "@/data/languages";
 import { images } from "@/constants/images";
+import { useLanguageStore } from "@/store/useLanguageStore";
 
 export default function LanguageSelectScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
+  const { selectedLanguageId: savedLanguageId, setSelectedLanguageId: saveLanguageId } = useLanguageStore();
+
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Default selection is Spanish ("es") as shown in the mockup
-  const [selectedLanguageId, setSelectedLanguageId] = useState<string>("es");
+  // Default selection is the saved language or Spanish ("es") as shown in the mockup
+  const [selectedLanguageId, setSelectedLanguageIdState] = useState<string>(savedLanguageId || "es");
 
   // Dynamic search filtering
   const filteredLanguages = languages.filter((lang) =>
@@ -34,15 +37,14 @@ export default function LanguageSelectScreen() {
   // Trigger haptic feedback and select language
   const handleSelectLanguage = (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedLanguageId(id);
+    setSelectedLanguageIdState(id);
   };
 
   // Action when Confirm is pressed
   const handleConfirm = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // For this step, simply navigate back. 
-    // In the next step, we will store this in Zustand/AsyncStorage.
-    router.back();
+    saveLanguageId(selectedLanguageId);
+    router.replace("/");
   };
 
   return (
