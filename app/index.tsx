@@ -60,6 +60,15 @@ export default function OnboardingScreen() {
             </Pressable>
 
             <Pressable
+              onPress={() => router.push("/language-select")}
+              className="border border-lingua-purple rounded-2xl py-4 items-center"
+            >
+              <Text className="text-[18px] font-poppins-bold text-lingua-purple">
+                Choose Language
+              </Text>
+            </Pressable>
+
+            <Pressable
               onPress={() => signOut()}
               className="border border-error rounded-2xl py-4 items-center"
             >
