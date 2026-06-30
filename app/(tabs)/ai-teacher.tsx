@@ -2,14 +2,13 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
-  Image,
   Pressable,
-  Alert,
+  Image,
   StyleSheet,
-  ActivityIndicator,
+  ImageBackground,
+  Alert,
   Modal,
   ScrollView,
-  NativeModules,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -25,41 +24,12 @@ import Animated, {
   cancelAnimation,
 } from "react-native-reanimated";
 
-import { useLanguageStore } from "@/store/useLanguageStore";
 import { useProgressStore } from "@/store/useProgressStore";
-import { images } from "@/constants/images";
+import { useLanguageStore } from "@/store/useLanguageStore";
 import { lessons } from "@/data/lessons";
 import { languages } from "@/data/languages";
+import { images } from "@/constants/images";
 import { useUser } from "@clerk/expo";
-import type { Call } from "@stream-io/video-react-native-sdk";
-
-let StreamCall: any = ({ children }: any) => <>{children}</>;
-let useStreamVideoClient: any = () => null;
-let useCallStateHooks: any = () => ({
-  useCallCallingState: () => "left",
-  useMicrophoneState: () => ({ status: "disabled" }),
-});
-let CallingState: any = {
-  LEFT: "left",
-  JOINED: "joined",
-  JOINING: "joining",
-  RECONNECTING: "reconnecting",
-  OFFLINE: "offline",
-};
-
-const hasWebRTC = !!NativeModules.WebRTCModule;
-if (hasWebRTC) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const sdk = require("@stream-io/video-react-native-sdk");
-    StreamCall = sdk.StreamCall;
-    useStreamVideoClient = sdk.useStreamVideoClient;
-    useCallStateHooks = sdk.useCallStateHooks;
-    CallingState = sdk.CallingState;
-  } catch (e) {
-    console.warn("Failed to load Stream Video SDK dynamically in AI Teacher:", e);
-  }
-}
 
 export default function AiTeacherScreen() {
   const router = useRouter();
@@ -67,10 +37,10 @@ export default function AiTeacherScreen() {
   const lessonId = params.lessonId;
 
   const { selectedLanguageId } = useLanguageStore();
-  const { completedLessonIds } = useProgressStore();
+  const { completedLessonIds, streak, completeLesson, addXp } = useProgressStore();
   const { user } = useUser();
-  const client = useStreamVideoClient();
 
+  // Load selected or next incomplete lesson
   const lesson = useMemo(() => {
     if (lessonId && typeof lessonId === "string") {
       return lessons.find((l) => l.id === lessonId) || null;
@@ -85,217 +55,14 @@ export default function AiTeacherScreen() {
     return languageLessons[0] || lessons[0];
   }, [lessonId, selectedLanguageId, completedLessonIds]);
 
-  const [call, setCall] = useState<Call | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
-
-  useEffect(() => {
-    if (!hasWebRTC) {
-      return;
-    }
-
-    if (!client || !user || !lesson) {
-      return;
-    }
-
-    let active = true;
-    let callInstance: Call | null = null;
-    const callId = `call-${lesson.id}-${user.id}`;
-    const callType = "audio_room";
-
-    const setupCall = async () => {
-      try {
-        setIsInitializing(true);
-        setError(null);
-
-        // 1. Setup the call parameters on the server first
-        const createCallResponse = await fetch("/api/create-call", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            callId,
-            userId: user.id,
-            lessonId: lesson.id,
-            languageId: selectedLanguageId || "es",
-            goals: lesson.goals,
-            vocabulary: lesson.activities.flatMap((a) => a.vocabularyItems || []),
-            phrases: lesson.activities.flatMap((a) => a.phrases || []),
-            aiTeacherPrompt: lesson.activities[0]?.aiTeacherPrompt || "",
-            callType,
-          }),
-        });
-
-        if (!createCallResponse.ok) {
-          throw new Error(`Failed to create call on server: ${createCallResponse.status}`);
-        }
-
-        if (!active) return;
-
-        // 2. Obtain client call reference
-        const c = client.call(callType, callId, { reuseInstance: true });
-        callInstance = c;
-        setCall(c);
-
-        try {
-          await c.microphone.enable();
-        } catch (deviceErr) {
-          console.warn("Could not enable microphone automatically:", deviceErr);
-        }
-
-        // Join call
-        await c.join({ create: false });
-        
-        if (active) {
-          setIsInitializing(false);
-        }
-      } catch (err: any) {
-        console.error("Failed to setup and join call:", err);
-        if (active) {
-          setError(err.message || "Failed to establish calling session");
-          setIsInitializing(false);
-        }
-      }
-    };
-
-    setupCall();
-
-    return () => {
-      active = false;
-      setIsInitializing(false);
-      if (callInstance) {
-        if (callInstance.state.callingState !== CallingState.LEFT) {
-          callInstance.leave().catch((err: any) => console.error("Error leaving call:", err));
-        }
-      }
-      setCall(null);
-    };
-  }, [client, user, lesson, selectedLanguageId]);
-
-  if (!hasWebRTC) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
-        <View className="flex-1 justify-center items-center px-6 bg-white">
-          <Ionicons name="videocam-off-outline" size={80} color="#6C4EF5" />
-          <Text className="text-[24px] font-poppins-bold text-text-primary mt-6 text-center">
-            AI Teacher calls are disabled
-          </Text>
-          <Text className="text-[16px] font-poppins text-text-secondary text-center mt-2 mb-8">
-            Audio calling is not supported in Expo Go. Please run the app on a native development build to practice with the AI Teacher.
-          </Text>
-          <Pressable
-            onPress={() => router.replace("/(tabs)/learn")}
-            className="bg-lingua-purple px-8 py-4 rounded-2xl active:opacity-90"
-          >
-            <Text className="text-white font-poppins-bold text-[16px]">Return to Path</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!lesson) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View className="flex-1 justify-center items-center px-6">
-          <Text className="text-[18px] font-poppins-bold text-error mb-2">Lesson Not Found</Text>
-          <Pressable onPress={() => router.replace("/(tabs)/learn")} className="bg-lingua-purple px-6 py-3 rounded-xl mt-4">
-            <Text className="text-white font-poppins-bold">Go to Lessons</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (isInitializing) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View className="flex-1 justify-center items-center px-6">
-          <ActivityIndicator size="large" color="#6C4EF5" />
-          <Text className="text-[16px] font-poppins-medium text-text-secondary mt-4">
-            Setting up audio classroom...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View className="flex-1 justify-center items-center px-6">
-          <Ionicons name="alert-circle-outline" size={60} color="#FF4D4F" />
-          <Text className="text-[18px] font-poppins-bold text-error mt-4 mb-2 text-center">
-            Connection Error
-          </Text>
-          <Text className="text-[14px] font-poppins text-text-secondary text-center mb-6">
-            {error}
-          </Text>
-          <Pressable
-            onPress={() => router.replace("/(tabs)/learn")}
-            className="bg-lingua-purple px-6 py-3 rounded-xl"
-          >
-            <Text className="text-white font-poppins-bold">Return to Path</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!call) return null;
-
-  return (
-    <StreamCall call={call}>
-      <AiTeacherScreenInner lesson={lesson} call={call} />
-    </StreamCall>
-  );
-}
-
-function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; call: Call }) {
-  const router = useRouter();
-  const { streak, completeLesson, addXp } = useProgressStore();
-  const { user } = useUser();
-
+  // Determine target language details
   const language = useMemo(() => {
     if (!lesson) return null;
     const langId = lesson.id.split("-")[0];
-    return languages.find((lang) => lang.id === langId) || null;
+    return languages.find((lang) => lang.id === langId) || languages[0];
   }, [lesson]);
 
-  // Hook into Stream call states
-  const { useCallCallingState, useMicrophoneState } = useCallStateHooks();
-  const callingState = useCallCallingState();
-  const { status: micStatus } = useMicrophoneState();
-
-  const isConnected = callingState === CallingState.JOINED;
-  const isMuted = micStatus === "disabled";
-
-  // Screen interactive state
-  const [isCameraOn, setIsCameraOn] = useState(true);
-  const [showSubtitles, setShowSubtitles] = useState(true);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [isDetailsVisible, setIsDetailsVisible] = useState(false);
-
-  // Conversation simulation state
-  const [sessionStatus, setSessionStatus] = useState("Connecting...");
-  const [phraseIndex, setPhraseIndex] = useState(0);
-  const [bubbleText, setBubbleText] = useState("");
-  const [bubbleTranslation, setBubbleTranslation] = useState("");
-  const [interactionStep, setInteractionStep] = useState<"greeting" | "listen" | "speak" | "feedback">("greeting");
-
-  // Performance feedback scores (simulated)
-  const [speakingScore, setSpeakingScore] = useState("Excellent");
-  const [pronunciationScore, setPronunciationScore] = useState("Great");
-  const [grammarScore, setGrammarScore] = useState("Good");
-
-  // Reanimated values for animations
-  const bubbleScale = useSharedValue(0);
-  const bubbleTranslateY = useSharedValue(20);
-  const soundwaveScale = useSharedValue(1);
-  const pulseScale = useSharedValue(1);
-
-  // Extract vocabulary and phrases from lesson data
+  // Dynamically extract phrases and vocabulary items from lesson activities
   const lessonPhrases = useMemo(() => {
     if (!lesson) return [];
     const items: { phrase: string; meaning: string }[] = [];
@@ -331,65 +98,90 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
     return items;
   }, [lesson]);
 
-  // Simulated AI dialog stages
-  const startGreetingSequence = useCallback(() => {
-    setInteractionStep("greeting");
-    const teacherName = lesson?.id.includes("es") ? "Sofia" : "Chloé";
-    setSessionStatus(`${teacherName} is speaking...`);
-    setBubbleText(`¡Hola! Welcome to your lesson. I am ${teacherName}. Let's learn!`);
-    setBubbleTranslation(`Hello! Welcome to your lesson. I am ${teacherName}. Let's learn!`);
+  // Determine teacher name based on language
+  const teacherName = useMemo(() => {
+    if (!lesson) return "Alex";
+    const langId = lesson.id.split("-")[0];
+    if (langId === "es") return "Sofia";
+    if (langId === "fr") return "Chloé";
+    if (langId === "ja") return "Sakura";
+    if (langId === "de") return "Hans";
+    if (langId === "ko") return "Min-ji";
+    if (langId === "it") return "Giulia";
+    return "Alex";
   }, [lesson]);
 
-  // Reset interactive simulation when callingState becomes JOINED
-  useEffect(() => {
-    if (callingState === CallingState.JOINED) {
-      setInteractionStep("greeting");
-      setPhraseIndex(0);
-      setSpeakingScore("Excellent");
-      setPronunciationScore("Great");
-      setGrammarScore("Good");
+  // Screen interactive state
+  const [isCameraOn, setIsCameraOn] = useState(true);
+  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [isDetailsVisible, setIsDetailsVisible] = useState(false);
 
-      setSessionStatus("Online");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      startGreetingSequence();
-    }
-  }, [callingState, lesson, startGreetingSequence]);
+  // Simulated AI dialog stages
+  const [stepIndex, setStepIndex] = useState(-1); // -1 is the greeting stage
+  const [sessionStatus, setSessionStatus] = useState("Connecting...");
+  const [bubbleText, setBubbleText] = useState("");
+  const [bubbleTranslation, setBubbleTranslation] = useState("");
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
-  // Animate speech bubble in when visible
+  // Performance feedback scores (simulated)
+  const [speakingScore, setSpeakingScore] = useState("Excellent");
+  const [pronunciationScore, setPronunciationScore] = useState("Great");
+  const [grammarScore, setGrammarScore] = useState("Good");
+
+  // Reanimated values for animations
+  const bubbleScale = useSharedValue(0);
+  const bubbleTranslateY = useSharedValue(20);
+  const soundwaveScale = useSharedValue(1);
+  const pulseScale = useSharedValue(1);
+  const mascotScale = useSharedValue(1);
+
+  // Speech bubble animation trigger
   useEffect(() => {
-    if (isConnected && showSubtitles) {
+    if (bubbleText !== "") {
       bubbleScale.value = withSpring(1, { damping: 12 });
       bubbleTranslateY.value = withSpring(0, { damping: 12 });
     } else {
-      bubbleScale.value = withTiming(0, { duration: 200 });
-      bubbleTranslateY.value = withTiming(20, { duration: 200 });
+      bubbleScale.value = withTiming(0, { duration: 150 });
+      bubbleTranslateY.value = withTiming(20, { duration: 150 });
     }
-  }, [isConnected, showSubtitles, bubbleScale, bubbleTranslateY]);
+  }, [bubbleText, bubbleScale, bubbleTranslateY]);
 
-  // Pulsating animation for volume/mic when active
+  // Pulsating animation for speaker icon when active
   useEffect(() => {
     if (isPlayingAudio) {
       soundwaveScale.value = withRepeat(
         withSequence(
-          withTiming(1.3, { duration: 200 }),
-          withTiming(1.0, { duration: 200 })
+          withTiming(1.25, { duration: 250 }),
+          withTiming(1.0, { duration: 250 })
+        ),
+        -1,
+        true
+      );
+      // Gentle mascot animation while speaking
+      mascotScale.value = withRepeat(
+        withSequence(
+          withTiming(1.03, { duration: 350 }),
+          withTiming(1.0, { duration: 350 })
         ),
         -1,
         true
       );
     } else {
       cancelAnimation(soundwaveScale);
+      cancelAnimation(mascotScale);
       soundwaveScale.value = 1;
+      mascotScale.value = 1;
     }
-  }, [isPlayingAudio, soundwaveScale]);
+  }, [isPlayingAudio, mascotScale, soundwaveScale]);
 
-  // Loop a gentle pulse for the mic button when user needs to speak
+  // Mic pulsating animation when active/recording
   useEffect(() => {
-    if (interactionStep === "speak" && !isMuted) {
+    if (isListening) {
       pulseScale.value = withRepeat(
         withSequence(
-          withTiming(1.15, { duration: 600 }),
-          withTiming(1.0, { duration: 600 })
+          withTiming(1.15, { duration: 550 }),
+          withTiming(1.0, { duration: 550 })
         ),
         -1,
         true
@@ -398,170 +190,177 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
       cancelAnimation(pulseScale);
       pulseScale.value = 1;
     }
-  }, [interactionStep, isMuted, pulseScale]);
+  }, [isListening, pulseScale]);
 
-  const handleSpeakerPress = () => {
-    if (isPlayingAudio) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsPlayingAudio(true);
-    const teacherName = lesson?.id.includes("es") ? "Sofia" : "Chloé";
+  // Dynamic teacher greeting sequence on mount
+  const startGreetingSequence = useCallback(() => {
+    if (!lesson) return;
     setSessionStatus(`${teacherName} is speaking...`);
+    setIsPlayingAudio(true);
 
-    // Simulated audio playback time
+    const langId = lesson.id.split("-")[0];
+    let greeting = `Hello! Welcome to your lesson. I am ${teacherName}. Let's learn!`;
+    let translation = `Hello! Welcome to your lesson. I am ${teacherName}. Let's learn!`;
+
+    if (langId === "es") {
+      greeting = `¡Hola! Bienvenido a tu lección de español. Soy ${teacherName}. ¡Comencemos!`;
+      translation = `Hello! Welcome to your Spanish lesson. I am ${teacherName}. Let's start!`;
+    } else if (langId === "fr") {
+      greeting = `Bonjour ! Bienvenue à votre leçon de français. Je suis ${teacherName}. Commençons !`;
+      translation = `Hello! Welcome to your French lesson. I am ${teacherName}. Let's start!`;
+    } else if (langId === "ja") {
+      greeting = `こんにちは！日本語のレッスンへようこそ。私は${teacherName}です。始めましょう！`;
+      translation = `Hello! Welcome to your Japanese lesson. I am ${teacherName}. Let's start!`;
+    } else if (langId === "de") {
+      greeting = `Hallo! Willkommen zu deiner Deutschstunde. Ich bin ${teacherName}. Fangen wir an!`;
+      translation = `Hello! Welcome to your German lesson. I am ${teacherName}. Let's start!`;
+    } else if (langId === "ko") {
+      greeting = `안녕하세요! 한국어 레슨에 오신 것을 환영합니다. 저는 ${teacherName}입니다. 시작해요!`;
+      translation = `Hello! Welcome to your Korean lesson. I am ${teacherName}. Let's start!`;
+    } else if (langId === "it") {
+      greeting = `Ciao! Benvenuto alla tua lezione di italiano. Sono ${teacherName}. Cominciamo!`;
+      translation = `Hello! Welcome to your Italian lesson. I am ${teacherName}. Let's start!`;
+    }
+
+    setBubbleText(greeting);
+    setBubbleTranslation(translation);
+
     setTimeout(() => {
       setIsPlayingAudio(false);
-      
-      // If we were in greeting, move to the first phrase
-      if (interactionStep === "greeting") {
-        setInteractionStep("listen");
-        const item = lessonPhrases[phraseIndex];
-        setBubbleText(item.phrase);
-        setBubbleTranslation(item.meaning);
-        setSessionStatus(`Listen to the teacher`);
-      } else if (interactionStep === "listen") {
-        // Invite the user to speak
-        setInteractionStep("speak");
-        setSessionStatus("Listening to you...");
-      }
-    }, 2500);
+      setSessionStatus("Online");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }, 2800);
+  }, [lesson, teacherName]);
+
+  // Initialize call
+  useEffect(() => {
+    setSessionStatus("Connecting...");
+    const timer = setTimeout(() => {
+      startGreetingSequence();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [startGreetingSequence]);
+
+  // Audio speaker press inside bubble
+  const handleSpeakerPress = () => {
+    if (isPlayingAudio || isListening) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsPlayingAudio(true);
+    setSessionStatus(`${teacherName} is speaking...`);
+
+    setTimeout(() => {
+      setIsPlayingAudio(false);
+      setSessionStatus("Online");
+    }, 2000);
   };
 
-  const handleMicPress = async () => {
+  // Mic press handles interactive dialogue cycle
+  const handleMicPress = () => {
+    if (!lesson) return;
+    if (isListening || isPlayingAudio) return;
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    // If muted/unmuted toggle outside "speak" step
-    if (interactionStep !== "speak") {
-      try {
-        await call.microphone.toggle();
-      } catch (err) {
-        console.error("Failed to toggle microphone:", err);
-      }
-      return;
-    }
-
-    if (isMuted) {
-      Alert.alert("Microphone Muted", "Please unmute your microphone to practice speaking.");
-      return;
-    }
-
-    // Simulate user speaking recording
+    setIsListening(true);
     setSessionStatus("Recording your voice...");
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    // Animate speech detection
+
+    // Simulate listening for 2 seconds
     setTimeout(() => {
       setSessionStatus("Analyzing pronunciation...");
       
+      // Simulate analysis for 1.5 seconds
       setTimeout(() => {
-        // Move to feedback stage
-        setInteractionStep("feedback");
-        setSessionStatus("Online");
+        setIsListening(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        // Update scores to reflect simulated output
+        // Update scores randomly
+        const scores = ["Excellent", "Great", "Good"];
         setSpeakingScore("Excellent");
-        setPronunciationScore("Great");
-        setGrammarScore("Good");
+        setPronunciationScore(scores[Math.floor(Math.random() * 2)]);
+        setGrammarScore(scores[Math.floor(Math.random() * 3)]);
 
-        // Set the success bubble text
-        const langId = lesson?.id.split("-")[0];
-        if (langId === "es") {
-          setBubbleText("¡Muy bien!");
-          setBubbleTranslation("That was great! 👏");
-        } else if (langId === "fr") {
-          setBubbleText("Très bien !");
-          setBubbleTranslation("That was great! 👏");
+        // Advance step
+        const nextIdx = stepIndex + 1;
+        if (nextIdx < lessonPhrases.length) {
+          setStepIndex(nextIdx);
+          const item = lessonPhrases[nextIdx];
+          setBubbleText(item.phrase);
+          setBubbleTranslation(item.meaning);
+          setSessionStatus("Online");
+
+          // Play the teacher's new phrase audio automatically
+          setIsPlayingAudio(true);
+          setSessionStatus(`${teacherName} is speaking...`);
+          setTimeout(() => {
+            setIsPlayingAudio(false);
+            setSessionStatus("Online");
+          }, 2200);
         } else {
-          setBubbleText("Excellent!");
-          setBubbleTranslation("That was great! 👏");
+          // Completed all phrases
+          setSessionStatus("Online");
+          Alert.alert(
+            "Lesson Completed! 🎉",
+            `Congratulations! You finished the audio dialogue "${lesson.title}" and earned +${lesson.xpReward} XP.`,
+            [
+              {
+                text: "Finish",
+                onPress: () => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  completeLesson(lesson.id);
+                  addXp(lesson.xpReward);
+                  router.replace("/(tabs)/learn");
+                },
+              },
+            ]
+          );
         }
       }, 1500);
     }, 2000);
   };
 
-  const nextPhrase = () => {
-    if (phraseIndex < lessonPhrases.length - 1) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const nextIdx = phraseIndex + 1;
-      setPhraseIndex(nextIdx);
-      setInteractionStep("listen");
-      const item = lessonPhrases[nextIdx];
-      setBubbleText(item.phrase);
-      setBubbleTranslation(item.meaning);
-      setSessionStatus(`Listen to the teacher`);
-    } else {
-      // Completed all phrases
-      Alert.alert(
-        "Lesson Finished!",
-        "You have completed all the exercises in this session. Tap End Call to save your progress.",
-        [{ text: "OK" }]
-      );
-    }
-  };
-
+  // Handle End Call confirm
   const handleEndCall = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Alert.alert(
-      "End Lesson",
-      "Would you like to finish the lesson and earn rewards, or exit without saving?",
+      "End Lesson?",
+      "Are you sure you want to exit the current lesson? Your progress for this session will be lost.",
       [
-        { text: "Cancel", style: "cancel" },
+        {
+          text: "Resume",
+          style: "cancel",
+        },
         {
           text: "Exit Lesson",
           style: "destructive",
-          onPress: async () => {
+          onPress: () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            try {
-              if (call.state.callingState !== CallingState.LEFT) {
-                await call.leave();
-              }
-            } catch (err) {
-              console.error("Error leaving call:", err);
-            }
             router.replace("/(tabs)/learn");
-          },
-        },
-        {
-          text: "Complete Lesson",
-          onPress: async () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            try {
-              if (call.state.callingState !== CallingState.LEFT) {
-                await call.leave();
-              }
-            } catch (err) {
-              console.error("Error leaving call:", err);
-            }
-            if (lesson) {
-              completeLesson(lesson.id);
-              addXp(lesson.xpReward);
-              Alert.alert(
-                "Congratulations!",
-                `You completed "${lesson.title}" and earned +${lesson.xpReward} XP!`,
-                [
-                  {
-                    text: "Great!",
-                    onPress: () => {
-                      router.replace("/(tabs)/learn");
-                    },
-                  },
-                ]
-              );
-            } else {
-              router.replace("/(tabs)/learn");
-            }
           },
         },
       ]
     );
   };
 
+  // Back chevron press
   const handleBack = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.replace("/(tabs)/learn");
+    Alert.alert(
+      "Exit Lesson?",
+      "Are you sure you want to leave? Your current audio session will end.",
+      [
+        { text: "Stay", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            router.replace("/(tabs)/learn");
+          },
+        },
+      ]
+    );
   };
 
-  // Animated styles
+  // Reanimated style bindings
   const animatedBubbleStyle = useAnimatedStyle(() => {
     return {
       transform: [
@@ -583,41 +382,52 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
     };
   });
 
-  const displayStatusText = useMemo(() => {
-    if (callingState === CallingState.JOINING) return "Connecting...";
-    if (callingState === CallingState.RECONNECTING) return "Reconnecting...";
-    if (callingState === CallingState.LEFT) return "Ended";
-    if (callingState === CallingState.OFFLINE) return "Offline";
-    return sessionStatus;
-  }, [callingState, sessionStatus]);
+  const animatedMascotStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: mascotScale.value }],
+    };
+  });
+
+  if (!lesson) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+        <View className="flex-1 justify-center items-center px-6">
+          <Text className="text-[18px] font-poppins-bold text-error mb-2">Lesson Not Found</Text>
+          <Pressable onPress={() => router.replace("/(tabs)/learn")} className="bg-lingua-purple px-6 py-3 rounded-xl mt-4">
+            <Text className="text-white font-poppins-bold">Go to Lessons</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <View className="flex-1 bg-white justify-between">
-      {/* ── HEADER BAR ── */}
+      {/* ── TOP HEADER ─────────────────────────── */}
       <SafeAreaView edges={["top"]} style={{ backgroundColor: "#FFFFFF" }}>
         <View className="flex-row items-center justify-between px-5 pt-3 pb-3 border-b border-[#F3F4F6] bg-white">
           <View className="flex-row items-center gap-3">
             <Pressable
               onPress={handleBack}
-              className="w-8 h-8 items-center justify-center active:opacity-70"
+              className="w-8 h-8 items-center justify-center active:opacity-75"
             >
               <Ionicons name="chevron-back" size={26} color="#0D132B" style={{ marginLeft: -6 }} />
             </Pressable>
             <View>
-              <Text className="text-[20px] font-poppins-bold text-text-primary leading-6">
+              <Text className="text-[20px] font-poppins-bold text-[#0D132B] leading-6">
                 AI Teacher
               </Text>
               <View className="flex-row items-center gap-1.5 mt-0.5">
-                <View className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-[#21C16B]" : "bg-error"}`} />
-                <Text className="text-[13px] font-poppins-medium text-text-secondary">
-                  {callingState === CallingState.JOINED ? "Online" : displayStatusText}
+                <View className="w-2 h-2 rounded-full bg-[#21C16B]" />
+                <Text className="text-[12px] font-poppins text-text-secondary">
+                  {sessionStatus === "Connecting..." ? "Connecting..." : "Online"}
                 </Text>
               </View>
             </View>
           </View>
 
-          {/* Right Header Icons */}
           <View className="flex-row items-center gap-2">
+            {/* Toggle Camera Action */}
             <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -634,12 +444,12 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
 
             {/* Streak Badge */}
             <View className="w-10 h-10 rounded-full border border-[#E5E7EB] bg-white items-center justify-center">
-              <Text className="text-[16px] font-poppins-medium text-text-primary">
+              <Text className="text-[15px] font-poppins-bold text-[#0D132B]">
                 {streak}
               </Text>
             </View>
 
-            {/* Profile Silhouette Details Trigger */}
+            {/* Silhouette Details Trigger */}
             <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -653,228 +463,214 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
         </View>
       </SafeAreaView>
 
-      {/* ── MAIN WORKSPACE ── */}
-      <View className="flex-1 relative mx-5 mt-4 mb-4 rounded-[32px] overflow-hidden border border-[#E5E7EB] bg-[#F3F4F6]">
-        {/* Integrated mascot and cozy room background */}
-        <Image
-          source={images.mascotAndRoom}
-          className="absolute inset-0 w-full h-full"
+      {/* ── MAIN WORKSPACE CARD ──────────────────────── */}
+      <View className="flex-1 relative mx-5 mt-3 mb-3 rounded-[32px] overflow-hidden border border-[#E5E7EB] bg-[#F3F4F6]">
+        <ImageBackground
+          source={images.roomBackground}
+          className="absolute inset-0 w-full h-full justify-between"
           resizeMode="cover"
-        />
-
-        {!isConnected && (
-          <View className="absolute inset-0 items-center justify-center bg-black/15">
-            <ActivityIndicator size="large" color="#6C4EF5" />
+        >
+          {/* Floating Status Badge inside workspace */}
+          <View className="absolute top-4 left-4 bg-black/40 rounded-full px-3 py-1.5 flex-row items-center gap-1.5">
+            {isListening || isPlayingAudio ? (
+              <View className="flex-row gap-0.5 items-center">
+                <View className="w-1 h-2.5 bg-white rounded-full animate-pulse" />
+                <View className="w-1 h-3.5 bg-white rounded-full" />
+                <View className="w-1 h-2 bg-white rounded-full animate-pulse" />
+              </View>
+            ) : (
+              <View className="w-1.5 h-1.5 rounded-full bg-[#21C16B]" />
+            )}
+            <Text className="text-[10px] font-poppins-bold text-white uppercase tracking-wider">
+              {sessionStatus}
+            </Text>
           </View>
-        )}
 
-        {/* Small PIP Window (upper right corner) */}
-        {isCameraOn && (
-          <View className="absolute top-4 right-4 w-24 h-32 rounded-2xl border-2 border-white overflow-hidden shadow-lg bg-gray-200">
-            <Image
-              source={user?.imageUrl ? { uri: user.imageUrl } : images.studentPreview}
-              className="w-full h-full"
-              resizeMode="cover"
-            />
+          {/* Student PIP Window (upper right) */}
+          {isCameraOn && (
+            <View 
+              style={styles.pipShadow}
+              className="absolute top-4 right-4 w-20 h-28 rounded-2xl border-2 border-white overflow-hidden bg-gray-200"
+            >
+              <Image
+                source={user?.imageUrl ? { uri: user.imageUrl } : images.studentPreview}
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+            </View>
+          )}
+
+          {/* Waving Mascot Fox Teacher */}
+          <View className="flex-1 justify-center items-center mt-6">
+            <Animated.View style={animatedMascotStyle}>
+              <Image
+                source={images.mascotFoxTeacher}
+                className="w-48 h-48 mt-4"
+                resizeMode="contain"
+              />
+            </Animated.View>
           </View>
-        )}
 
-        {/* Interactive Speech Bubble */}
-        {isConnected && showSubtitles && (
-          <Animated.View
-            style={[animatedBubbleStyle]}
-            className="absolute bottom-[16px] left-[16px] right-[16px] bg-white rounded-[24px] p-5 shadow-md border border-[#F3F4F6] z-30"
-          >
-            <View className="flex-row items-center justify-between gap-3">
-              <View className="flex-1">
-                {interactionStep === "speak" && (
-                  <Text className="text-[11px] font-poppins-bold text-lingua-purple uppercase tracking-wider mb-0.5">
-                    Repeat:
+          {/* Compact Speech Bubble (Subtitles must not cover background image completely) */}
+          {bubbleText !== "" && (
+            <Animated.View
+              style={[animatedBubbleStyle]}
+              className="absolute bottom-[94px] left-4 right-4 bg-white rounded-[24px] p-4 shadow-lg border border-[#F3F4F6] z-30"
+            >
+              <View className="flex-row items-center justify-between gap-3">
+                <View className="flex-1">
+                  <Text className="text-[16px] font-poppins-bold text-[#0D132B] leading-5">
+                    {bubbleText}
                   </Text>
-                )}
-                <Text className="text-[19px] font-poppins-bold text-text-primary leading-6">
-                  {bubbleText}
-                </Text>
-                <Text className="text-[14px] font-poppins text-text-secondary mt-1 leading-5">
-                  {bubbleTranslation}
+                  {showSubtitles && (
+                    <Text className="text-[13px] font-poppins text-text-secondary mt-1 leading-4">
+                      {bubbleTranslation}
+                    </Text>
+                  )}
+                </View>
+
+                {/* Speaker Button */}
+                <Pressable
+                  onPress={handleSpeakerPress}
+                  disabled={isPlayingAudio || isListening}
+                  className="w-8 h-8 items-center justify-center rounded-full bg-slate-50 active:bg-slate-100"
+                >
+                  <Animated.View style={animatedSpeakerStyle}>
+                    <Ionicons
+                      name="volume-high"
+                      size={20}
+                      color="#6C4EF5"
+                    />
+                  </Animated.View>
+                </Pressable>
+              </View>
+
+              {/* Bubble Arrow pointing down */}
+              <View
+                className="absolute -bottom-2 right-[15%] w-4 h-4 bg-white rotate-45 border-r border-b border-[#F3F4F6]"
+              />
+            </Animated.View>
+          )}
+
+          {/* Faded Background bottom area that holds controls */}
+          <View className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-black/40 via-black/20 to-transparent justify-end pb-3">
+            {/* Audio Lesson Controls */}
+            <View className="flex-row justify-around items-center px-4 w-full">
+              {/* Camera Button */}
+              <View className="items-center">
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setIsCameraOn(!isCameraOn);
+                  }}
+                  className={`w-12 h-12 rounded-full items-center justify-center shadow-md ${
+                    isCameraOn ? "bg-white" : "bg-white/20 border border-white/30"
+                  }`}
+                >
+                  <Ionicons
+                    name={isCameraOn ? "videocam-outline" : "videocam-off-outline"}
+                    size={20}
+                    color={isCameraOn ? "#0D132B" : "#FFFFFF"}
+                  />
+                </Pressable>
+                <Text className="text-[11px] font-poppins-medium text-white mt-1.5">
+                  Camera
                 </Text>
               </View>
 
-              {/* Blue Speaker Icon */}
-              <Pressable
-                onPress={handleSpeakerPress}
-                disabled={isPlayingAudio}
-                className="p-1 items-center justify-center active:opacity-70"
-              >
-                <Animated.View style={animatedSpeakerStyle}>
-                  <Ionicons
-                    name={isPlayingAudio ? "volume-high" : "volume-medium"}
-                    size={24}
-                    color="#6C4EF5"
-                  />
+              {/* Microphone/Speak Button */}
+              <View className="items-center">
+                <Animated.View style={animatedMicStyle}>
+                  <Pressable
+                    onPress={handleMicPress}
+                    className={`w-12 h-12 rounded-full items-center justify-center shadow-md ${
+                      isListening ? "bg-[#EBFDF5]" : "bg-white"
+                    }`}
+                  >
+                    <Ionicons
+                      name="mic-outline"
+                      size={20}
+                      color={isListening ? "#10B981" : "#0D132B"}
+                    />
+                  </Pressable>
                 </Animated.View>
-              </Pressable>
+                <Text className="text-[11px] font-poppins-medium text-white mt-1.5">
+                  Mic
+                </Text>
+              </View>
+
+              {/* Subtitles Button */}
+              <View className="items-center">
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setShowSubtitles(!showSubtitles);
+                  }}
+                  className={`w-12 h-12 rounded-full items-center justify-center shadow-md ${
+                    showSubtitles ? "bg-white" : "bg-white/20 border border-white/30"
+                  }`}
+                >
+                  <MaterialIcons
+                    name="translate"
+                    size={20}
+                    color={showSubtitles ? "#0D132B" : "#FFFFFF"}
+                  />
+                </Pressable>
+                <Text className="text-[11px] font-poppins-medium text-white mt-1.5">
+                  Subtitles
+                </Text>
+              </View>
+
+              {/* End Call Button */}
+              <View className="items-center">
+                <Pressable
+                  onPress={handleEndCall}
+                  className="w-12 h-12 rounded-full bg-[#FF3B30] items-center justify-center shadow-md active:bg-[#D32F2F]"
+                >
+                  <View style={{ transform: [{ rotate: "135deg" }] }}>
+                    <Ionicons name="call" size={20} color="#FFFFFF" />
+                  </View>
+                </Pressable>
+                <Text className="text-[11px] font-poppins-medium text-white mt-1.5">
+                  End Call
+                </Text>
+              </View>
             </View>
-
-            {/* Bubble arrow / pointer */}
-            <View
-              className="absolute -bottom-2 right-[15%] w-4 h-4 bg-white rotate-45 border-r border-b border-[#F3F4F6]"
-            />
-          </Animated.View>
-        )}
-
-        {/* Floating status badge inside workspace */}
-        <View className="absolute top-4 left-4 bg-black/40 rounded-full px-3 py-1.5 flex-row items-center gap-1.5">
-          {isPlayingAudio || interactionStep === "speak" ? (
-            <View className="flex-row gap-0.5 items-center">
-              <View className="w-1.5 h-3 bg-white rounded-full animate-pulse" />
-              <View className="w-1.5 h-4 bg-white rounded-full" />
-              <View className="w-1.5 h-2.5 bg-white rounded-full animate-pulse" />
-            </View>
-          ) : (
-            <Ionicons name="mic-outline" size={12} color="#FFFFFF" />
-          )}
-          <Text className="text-[11px] font-poppins-bold text-white uppercase tracking-wider">
-            {displayStatusText}
-          </Text>
-        </View>
-
-        {/* Cycle phrase helper button when in feedback stage */}
-        {interactionStep === "feedback" && phraseIndex < lessonPhrases.length - 1 && (
-          <Pressable
-            onPress={nextPhrase}
-            className="absolute bottom-[165px] right-4 bg-lingua-purple px-4 py-2 rounded-full flex-row items-center gap-1 shadow-lg active:opacity-90 z-40"
-          >
-            <Text className="text-white font-poppins-bold text-[12px]">Next Phrase</Text>
-            <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
-          </Pressable>
-        )}
+          </View>
+        </ImageBackground>
       </View>
 
-      {/* ── AUDIO CONTROLS PANEL ── */}
-      <View className="flex-row justify-around items-center px-4 py-3 bg-white border-b border-[#F3F4F6]">
-        {/* Toggle Camera Button */}
-        <View className="items-center">
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setIsCameraOn(!isCameraOn);
-            }}
-            className={`w-16 h-16 rounded-full items-center justify-center shadow-sm border ${
-              isCameraOn ? "bg-white border-[#E5E7EB]" : "bg-[#FFF0F0] border-error"
-            }`}
-          >
-            <Ionicons
-              name={isCameraOn ? "videocam" : "videocam-off"}
-              size={24}
-              color={isCameraOn ? "#0D132B" : "#FF4D4F"}
-            />
-          </Pressable>
-          <Text className="text-[12px] font-poppins-medium text-text-secondary mt-2">
-            Camera
-          </Text>
-        </View>
-
-        {/* Toggle Microphone Button */}
-        <View className="items-center">
-          <Animated.View style={animatedMicStyle}>
-            <Pressable
-              onPress={handleMicPress}
-              className={`w-16 h-16 rounded-full items-center justify-center shadow-sm border ${
-                interactionStep === "speak" && !isMuted
-                  ? "bg-[#EBFDF5] border-[#10B981]"
-                  : isMuted
-                  ? "bg-[#FFF0F0] border-error"
-                  : "bg-white border-[#E5E7EB]"
-              }`}
-            >
-              <Ionicons
-                name={isMuted ? "mic-off" : "mic"}
-                size={24}
-                color={
-                  interactionStep === "speak" && !isMuted
-                    ? "#10B981"
-                    : isMuted
-                    ? "#FF4D4F"
-                    : "#0D132B"
-                }
-              />
-            </Pressable>
-          </Animated.View>
-          <Text className="text-[12px] font-poppins-medium text-text-secondary mt-2">
-            Mic
-          </Text>
-        </View>
-
-        {/* Toggle Subtitles Button */}
-        <View className="items-center">
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowSubtitles(!showSubtitles);
-            }}
-            className={`w-16 h-16 rounded-full items-center justify-center shadow-sm border ${
-              showSubtitles ? "bg-white border-[#E5E7EB]" : "bg-[#F3F4F6] border-border"
-            }`}
-          >
-            <MaterialIcons
-              name="translate"
-              size={24}
-              color={showSubtitles ? "#0D132B" : "#9CA3AF"}
-            />
-          </Pressable>
-          <Text className="text-[12px] font-poppins-medium text-text-secondary mt-2">
-            Subtitles
-          </Text>
-        </View>
-
-        {/* End Call Button */}
-        <View className="items-center">
-          <Pressable
-            onPress={handleEndCall}
-            className="w-16 h-16 rounded-full bg-[#FF3B30] items-center justify-center shadow-md active:opacity-90"
-          >
-            <View style={{ transform: [{ rotate: "135deg" }] }}>
-              <Ionicons name="call" size={24} color="#FFFFFF" />
-            </View>
-          </Pressable>
-          <Text className="text-[12px] font-poppins-medium text-text-secondary mt-2">
-            End Call
-          </Text>
-        </View>
-      </View>
-
-      {/* ── ANALYSIS / FEEDBACK SUMMARY CARD ── */}
-      <View className="mx-5 my-4 bg-[#FAF9FF] border border-[#ECE9FF] rounded-[24px] py-4 px-2 flex-row justify-between items-center shadow-sm shadow-[#6C4EF5]/5">
+      {/* ── FEEDBACK / SUMMARY CARD ───────────────────── */}
+      <View className="mx-5 my-2 bg-[#FAF9FF] border border-[#ECE9FF] rounded-[24px] py-4 px-2 flex-row justify-between items-center shadow-sm">
         <View className="items-center flex-1 px-1">
-          <Text className="text-[#0D132B] font-poppins-medium text-[12px] uppercase tracking-wider mb-0.5" numberOfLines={1}>
+          <Text className="text-[#0D132B] font-poppins-medium text-[11px] uppercase tracking-wider mb-0.5" numberOfLines={1}>
             Speaking
           </Text>
-          <Text className="text-[#21C16B] font-poppins-bold text-[15px]" numberOfLines={1}>
+          <Text className="text-[#21C16B] font-poppins-bold text-[14px]" numberOfLines={1}>
             {speakingScore}
           </Text>
         </View>
         <View className="w-[1px] bg-[#ECE9FF] h-8" />
         <View className="items-center flex-1 px-1">
-          <Text className="text-[#0D132B] font-poppins-medium text-[12px] uppercase tracking-wider mb-0.5" numberOfLines={1}>
+          <Text className="text-[#0D132B] font-poppins-medium text-[11px] uppercase tracking-wider mb-0.5" numberOfLines={1}>
             Pronunciation
           </Text>
-          <Text className="text-[#2F80ED] font-poppins-bold text-[15px]" numberOfLines={1}>
+          <Text className="text-[#2F80ED] font-poppins-bold text-[14px]" numberOfLines={1}>
             {pronunciationScore}
           </Text>
         </View>
         <View className="w-[1px] bg-[#ECE9FF] h-8" />
         <View className="items-center flex-1 px-1">
-          <Text className="text-[#0D132B] font-poppins-medium text-[12px] uppercase tracking-wider mb-0.5" numberOfLines={1}>
+          <Text className="text-[#0D132B] font-poppins-medium text-[11px] uppercase tracking-wider mb-0.5" numberOfLines={1}>
             Grammar
           </Text>
-          <Text className="text-[#9B51E0] font-poppins-bold text-[15px]" numberOfLines={1}>
+          <Text className="text-[#9B51E0] font-poppins-bold text-[14px]" numberOfLines={1}>
             {grammarScore}
           </Text>
         </View>
       </View>
 
-      {/* ── TEACHER / LESSON INFORMATION OVERLAY MODAL ── */}
+      {/* ── SESSION DETAILS MODAL ──────────────────────── */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -882,9 +678,10 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
         onRequestClose={() => setIsDetailsVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent} className="bg-white rounded-t-[32px] p-6 shadow-2xl">
+          <View style={styles.modalContent} className="bg-white rounded-t-[32px] p-6">
+            {/* Modal Header */}
             <View className="flex-row justify-between items-center pb-4 border-b border-[#F3F4F6] mb-5">
-              <Text className="text-[20px] font-poppins-bold text-text-primary">
+              <Text className="text-[20px] font-poppins-bold text-[#0D132B]">
                 Session Information
               </Text>
               <Pressable
@@ -895,15 +692,15 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-              {/* User / Student Info */}
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+              {/* Student info card */}
               <View className="bg-[#FAF9FF] border border-[#ECE9FF] rounded-[24px] p-4 mb-4 flex-row items-center gap-3">
                 <Image
                   source={user?.imageUrl ? { uri: user.imageUrl } : images.studentPreview}
                   className="w-12 h-12 rounded-full bg-[#E5E7EB]"
                 />
                 <View className="flex-1">
-                  <Text className="text-[15px] font-poppins-bold text-text-primary">
+                  <Text className="text-[15px] font-poppins-bold text-[#0D132B]">
                     {user?.fullName || user?.username || "Student"}
                   </Text>
                   <Text className="text-[12px] font-poppins text-text-secondary">
@@ -912,7 +709,7 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
                 </View>
               </View>
 
-              {/* Teacher Info Card */}
+              {/* AI Teacher Details */}
               <View className="bg-[#FAF9FF] border border-[#ECE9FF] rounded-[24px] p-5 mb-5 flex-row items-center gap-4">
                 <Image
                   source={images.mascotFoxTeacher}
@@ -920,21 +717,21 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
                   resizeMode="contain"
                 />
                 <View className="flex-1">
-                  <Text className="text-[18px] font-poppins-bold text-text-primary">
-                    {lesson?.id.includes("es") ? "Sofia" : "Chloé"}
+                  <Text className="text-[18px] font-poppins-bold text-[#0D132B]">
+                    {teacherName}
                   </Text>
                   <Text className="text-[13px] font-poppins-medium text-lingua-purple">
-                    AI Native {language?.name || "Target Language"} Teacher
+                    AI Native {language?.name || "Target"} Teacher {language?.flag}
                   </Text>
                 </View>
               </View>
 
               {/* Lesson Objectives */}
-              <Text className="text-[15px] font-poppins-bold text-text-primary mb-2">
+              <Text className="text-[15px] font-poppins-bold text-[#0D132B] mb-2">
                 Lesson Objectives
               </Text>
               <View className="bg-[#F6F7FB] rounded-2xl p-4 mb-5">
-                <Text className="text-[16px] font-poppins-bold text-text-primary mb-1">
+                <Text className="text-[16px] font-poppins-bold text-[#0D132B] mb-1">
                   {lesson.title}
                 </Text>
                 <Text className="text-[13px] font-poppins text-text-secondary mb-3 leading-5">
@@ -944,7 +741,7 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
                   {lesson.goals.map((goal, idx) => (
                     <View key={idx} className="flex-row items-center gap-2">
                       <Ionicons name="checkmark-circle-outline" size={16} color="#6C4EF5" />
-                      <Text className="text-[13px] font-poppins-medium text-text-primary flex-1">
+                      <Text className="text-[13px] font-poppins-medium text-[#0D132B] flex-1">
                         {goal}
                       </Text>
                     </View>
@@ -952,15 +749,19 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
                 </View>
               </View>
 
-              {/* Lesson Vocabulary / Phrases */}
-              <Text className="text-[15px] font-poppins-bold text-text-primary mb-2">
+              {/* Phrases list */}
+              <Text className="text-[15px] font-poppins-bold text-[#0D132B] mb-2">
                 Phrases to Practice
               </Text>
               <View className="bg-[#F6F7FB] rounded-2xl p-4 mb-5 gap-3.5">
                 {lessonPhrases.map((item, idx) => (
-                  <View key={idx} className="flex-row justify-between items-start gap-4 pb-3 border-b border-[#E5E7EB] last:border-b-0">
+                  <View 
+                    key={idx} 
+                    className="flex-row justify-between items-start gap-4 pb-3 border-b border-[#E5E7EB]"
+                    style={{ borderBottomWidth: idx === lessonPhrases.length - 1 ? 0 : 1 }}
+                  >
                     <View className="flex-1">
-                      <Text className="text-[15px] font-poppins-bold text-text-primary">
+                      <Text className="text-[15px] font-poppins-bold text-[#0D132B]">
                         {item.phrase}
                       </Text>
                       <Text className="text-[12px] font-poppins text-text-secondary mt-0.5">
@@ -970,25 +771,29 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
                     <Pressable
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        Alert.alert("Target Phrase", `Practice saying: "${item.phrase}"`);
+                        Alert.alert("Practice Saying", `"${item.phrase}"`);
                       }}
-                      className="w-8 h-8 rounded-full bg-[#E5E7EB] items-center justify-center"
+                      className="w-8 h-8 rounded-full bg-[#E5E7EB] items-center justify-center active:bg-[#D1D5DB]"
                     >
-                      <Ionicons name="mic" size={14} color="#6B7280" />
+                      <Ionicons name="mic-outline" size={14} color="#6B7280" />
                     </Pressable>
                   </View>
                 ))}
               </View>
 
-              {/* AI Prompts / Context */}
-              <Text className="text-[15px] font-poppins-bold text-text-primary mb-2">
-                AI Behavior Directives
-              </Text>
-              <View className="bg-[#FAF9FF] border border-[#ECE9FF] rounded-2xl p-4">
-                <Text className="text-[12px] font-poppins text-text-secondary leading-5 italic">
-                  {"\""}{lesson.activities[0]?.aiTeacherPrompt || "You are a friendly language instructor focused on pronunciation and sentence construction."}{"\""}
-                </Text>
-              </View>
+              {/* AI Teacher behavior prompt */}
+              {lesson.activities[0]?.aiTeacherPrompt && (
+                <>
+                  <Text className="text-[15px] font-poppins-bold text-[#0D132B] mb-2">
+                    AI Behavior Directives
+                  </Text>
+                  <View className="bg-[#FAF9FF] border border-[#ECE9FF] rounded-2xl p-4">
+                    <Text className="text-[12px] font-poppins text-text-secondary leading-5 italic">
+                      {"\""}{lesson.activities[0].aiTeacherPrompt}{"\""}
+                    </Text>
+                  </View>
+                </>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -998,9 +803,12 @@ function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; cal
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
+  pipShadow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   modalOverlay: {
     flex: 1,

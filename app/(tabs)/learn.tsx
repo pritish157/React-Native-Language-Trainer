@@ -125,7 +125,7 @@ export default function LearnScreen() {
           text: isCompleted ? "Review" : "Start",
           onPress: () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.push(`/lesson/${lesson.id}`);
+            router.push({ pathname: "/(tabs)/ai-teacher", params: { lessonId: lesson.id } });
           },
         },
       ]
