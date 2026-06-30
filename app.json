@@ -40,6 +40,22 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      "@stream-io/video-react-native-sdk",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "muolingo requires camera access to capture and transmit video",
+          "microphonePermission": "muolingo requires microphone access to capture and transmit audio"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
       ]
     ],
     "experiments": {

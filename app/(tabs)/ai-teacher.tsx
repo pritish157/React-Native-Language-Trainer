@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  NativeModules,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -29,6 +30,36 @@ import { useProgressStore } from "@/store/useProgressStore";
 import { images } from "@/constants/images";
 import { lessons } from "@/data/lessons";
 import { languages } from "@/data/languages";
+import { useUser } from "@clerk/expo";
+import type { Call } from "@stream-io/video-react-native-sdk";
+
+let StreamCall: any = ({ children }: any) => <>{children}</>;
+let useStreamVideoClient: any = () => null;
+let useCallStateHooks: any = () => ({
+  useCallCallingState: () => "left",
+  useMicrophoneState: () => ({ status: "disabled" }),
+});
+let CallingState: any = {
+  LEFT: "left",
+  JOINED: "joined",
+  JOINING: "joining",
+  RECONNECTING: "reconnecting",
+  OFFLINE: "offline",
+};
+
+const hasWebRTC = !!NativeModules.WebRTCModule;
+if (hasWebRTC) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sdk = require("@stream-io/video-react-native-sdk");
+    StreamCall = sdk.StreamCall;
+    useStreamVideoClient = sdk.useStreamVideoClient;
+    useCallStateHooks = sdk.useCallStateHooks;
+    CallingState = sdk.CallingState;
+  } catch (e) {
+    console.warn("Failed to load Stream Video SDK dynamically in AI Teacher:", e);
+  }
+}
 
 export default function AiTeacherScreen() {
   const router = useRouter();
@@ -36,26 +67,195 @@ export default function AiTeacherScreen() {
   const lessonId = params.lessonId;
 
   const { selectedLanguageId } = useLanguageStore();
-  const { streak, completeLesson, addXp, completedLessonIds } = useProgressStore();
+  const { completedLessonIds } = useProgressStore();
+  const { user } = useUser();
+  const client = useStreamVideoClient();
 
-  // Load lesson based on route param or fallback
   const lesson = useMemo(() => {
-    // If a specific lesson ID is passed via search params
     if (lessonId && typeof lessonId === "string") {
       return lessons.find((l) => l.id === lessonId) || null;
     }
     
-    // Fallback: get lessons for selected language
     const langId = selectedLanguageId || "es";
     const languageLessons = lessons.filter((l) => l.id.startsWith(langId));
     
-    // Find first incomplete lesson
     const incomplete = languageLessons.find((l) => !completedLessonIds.includes(l.id));
     if (incomplete) return incomplete;
     
-    // If all completed, return first lesson
     return languageLessons[0] || lessons[0];
   }, [lessonId, selectedLanguageId, completedLessonIds]);
+
+  const [call, setCall] = useState<Call | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    if (!hasWebRTC) {
+      return;
+    }
+
+    if (!client || !user || !lesson) {
+      return;
+    }
+
+    let active = true;
+    let callInstance: Call | null = null;
+    const callId = `call-${lesson.id}-${user.id}`;
+    const callType = "audio_room";
+
+    const setupCall = async () => {
+      try {
+        setIsInitializing(true);
+        setError(null);
+
+        // 1. Setup the call parameters on the server first
+        const createCallResponse = await fetch("/api/create-call", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            callId,
+            userId: user.id,
+            lessonId: lesson.id,
+            languageId: selectedLanguageId || "es",
+            goals: lesson.goals,
+            vocabulary: lesson.activities.flatMap((a) => a.vocabularyItems || []),
+            phrases: lesson.activities.flatMap((a) => a.phrases || []),
+            aiTeacherPrompt: lesson.activities[0]?.aiTeacherPrompt || "",
+            callType,
+          }),
+        });
+
+        if (!createCallResponse.ok) {
+          throw new Error(`Failed to create call on server: ${createCallResponse.status}`);
+        }
+
+        if (!active) return;
+
+        // 2. Obtain client call reference
+        const c = client.call(callType, callId, { reuseInstance: true });
+        callInstance = c;
+        setCall(c);
+
+        try {
+          await c.microphone.enable();
+        } catch (deviceErr) {
+          console.warn("Could not enable microphone automatically:", deviceErr);
+        }
+
+        // Join call
+        await c.join({ create: false });
+        
+        if (active) {
+          setIsInitializing(false);
+        }
+      } catch (err: any) {
+        console.error("Failed to setup and join call:", err);
+        if (active) {
+          setError(err.message || "Failed to establish calling session");
+          setIsInitializing(false);
+        }
+      }
+    };
+
+    setupCall();
+
+    return () => {
+      active = false;
+      setIsInitializing(false);
+      if (callInstance) {
+        if (callInstance.state.callingState !== CallingState.LEFT) {
+          callInstance.leave().catch((err: any) => console.error("Error leaving call:", err));
+        }
+      }
+      setCall(null);
+    };
+  }, [client, user, lesson, selectedLanguageId]);
+
+  if (!hasWebRTC) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+        <View className="flex-1 justify-center items-center px-6 bg-white">
+          <Ionicons name="videocam-off-outline" size={80} color="#6C4EF5" />
+          <Text className="text-[24px] font-poppins-bold text-text-primary mt-6 text-center">
+            AI Teacher calls are disabled
+          </Text>
+          <Text className="text-[16px] font-poppins text-text-secondary text-center mt-2 mb-8">
+            Audio calling is not supported in Expo Go. Please run the app on a native development build to practice with the AI Teacher.
+          </Text>
+          <Pressable
+            onPress={() => router.replace("/(tabs)/learn")}
+            className="bg-lingua-purple px-8 py-4 rounded-2xl active:opacity-90"
+          >
+            <Text className="text-white font-poppins-bold text-[16px]">Return to Path</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!lesson) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View className="flex-1 justify-center items-center px-6">
+          <Text className="text-[18px] font-poppins-bold text-error mb-2">Lesson Not Found</Text>
+          <Pressable onPress={() => router.replace("/(tabs)/learn")} className="bg-lingua-purple px-6 py-3 rounded-xl mt-4">
+            <Text className="text-white font-poppins-bold">Go to Lessons</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isInitializing) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View className="flex-1 justify-center items-center px-6">
+          <ActivityIndicator size="large" color="#6C4EF5" />
+          <Text className="text-[16px] font-poppins-medium text-text-secondary mt-4">
+            Setting up audio classroom...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View className="flex-1 justify-center items-center px-6">
+          <Ionicons name="alert-circle-outline" size={60} color="#FF4D4F" />
+          <Text className="text-[18px] font-poppins-bold text-error mt-4 mb-2 text-center">
+            Connection Error
+          </Text>
+          <Text className="text-[14px] font-poppins text-text-secondary text-center mb-6">
+            {error}
+          </Text>
+          <Pressable
+            onPress={() => router.replace("/(tabs)/learn")}
+            className="bg-lingua-purple px-6 py-3 rounded-xl"
+          >
+            <Text className="text-white font-poppins-bold">Return to Path</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!call) return null;
+
+  return (
+    <StreamCall call={call}>
+      <AiTeacherScreenInner lesson={lesson} call={call} />
+    </StreamCall>
+  );
+}
+
+function AiTeacherScreenInner({ lesson, call }: { lesson: typeof lessons[0]; call: Call }) {
+  const router = useRouter();
+  const { streak, completeLesson, addXp } = useProgressStore();
+  const { user } = useUser();
 
   const language = useMemo(() => {
     if (!lesson) return null;
@@ -63,9 +263,15 @@ export default function AiTeacherScreen() {
     return languages.find((lang) => lang.id === langId) || null;
   }, [lesson]);
 
+  // Hook into Stream call states
+  const { useCallCallingState, useMicrophoneState } = useCallStateHooks();
+  const callingState = useCallCallingState();
+  const { status: micStatus } = useMicrophoneState();
+
+  const isConnected = callingState === CallingState.JOINED;
+  const isMuted = micStatus === "disabled";
+
   // Screen interactive state
-  const [isConnected, setIsConnected] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -134,24 +340,20 @@ export default function AiTeacherScreen() {
     setBubbleTranslation(`Hello! Welcome to your lesson. I am ${teacherName}. Let's learn!`);
   }, [lesson]);
 
-  // Reset interactive simulation when lesson changes
+  // Reset interactive simulation when callingState becomes JOINED
   useEffect(() => {
-    setIsConnected(false);
-    setInteractionStep("greeting");
-    setPhraseIndex(0);
-    setSpeakingScore("Excellent");
-    setPronunciationScore("Great");
-    setGrammarScore("Good");
+    if (callingState === CallingState.JOINED) {
+      setInteractionStep("greeting");
+      setPhraseIndex(0);
+      setSpeakingScore("Excellent");
+      setPronunciationScore("Great");
+      setGrammarScore("Good");
 
-    const timer = setTimeout(() => {
-      setIsConnected(true);
       setSessionStatus("Online");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       startGreetingSequence();
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [lesson, startGreetingSequence]);
+    }
+  }, [callingState, lesson, startGreetingSequence]);
 
   // Animate speech bubble in when visible
   useEffect(() => {
@@ -224,12 +426,16 @@ export default function AiTeacherScreen() {
     }, 2500);
   };
 
-  const handleMicPress = () => {
+  const handleMicPress = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // If muted/unmuted toggle
+    // If muted/unmuted toggle outside "speak" step
     if (interactionStep !== "speak") {
-      setIsMuted(!isMuted);
+      try {
+        await call.microphone.toggle();
+      } catch (err) {
+        console.error("Failed to toggle microphone:", err);
+      }
       return;
     }
 
@@ -303,15 +509,29 @@ export default function AiTeacherScreen() {
         {
           text: "Exit Lesson",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            try {
+              if (call.state.callingState !== CallingState.LEFT) {
+                await call.leave();
+              }
+            } catch (err) {
+              console.error("Error leaving call:", err);
+            }
             router.replace("/(tabs)/learn");
           },
         },
         {
           text: "Complete Lesson",
-          onPress: () => {
+          onPress: async () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            try {
+              if (call.state.callingState !== CallingState.LEFT) {
+                await call.leave();
+              }
+            } catch (err) {
+              console.error("Error leaving call:", err);
+            }
             if (lesson) {
               completeLesson(lesson.id);
               addXp(lesson.xpReward);
@@ -363,18 +583,13 @@ export default function AiTeacherScreen() {
     };
   });
 
-  if (!lesson) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View className="flex-1 justify-center items-center px-6">
-          <Text className="text-[18px] font-poppins-bold text-error mb-2">Lesson Not Found</Text>
-          <Pressable onPress={() => router.replace("/(tabs)/learn")} className="bg-lingua-purple px-6 py-3 rounded-xl mt-4">
-            <Text className="text-white font-poppins-bold">Go to Lessons</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const displayStatusText = useMemo(() => {
+    if (callingState === CallingState.JOINING) return "Connecting...";
+    if (callingState === CallingState.RECONNECTING) return "Reconnecting...";
+    if (callingState === CallingState.LEFT) return "Ended";
+    if (callingState === CallingState.OFFLINE) return "Offline";
+    return sessionStatus;
+  }, [callingState, sessionStatus]);
 
   return (
     <View className="flex-1 bg-white justify-between">
@@ -393,9 +608,9 @@ export default function AiTeacherScreen() {
                 AI Teacher
               </Text>
               <View className="flex-row items-center gap-1.5 mt-0.5">
-                <View className="w-2.5 h-2.5 rounded-full bg-[#21C16B]" />
+                <View className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-[#21C16B]" : "bg-error"}`} />
                 <Text className="text-[13px] font-poppins-medium text-text-secondary">
-                  {isConnected ? "Online" : "Connecting..."}
+                  {callingState === CallingState.JOINED ? "Online" : displayStatusText}
                 </Text>
               </View>
             </View>
@@ -417,7 +632,7 @@ export default function AiTeacherScreen() {
               />
             </Pressable>
 
-            {/* Streak Badge (Number 12 without fire, matching base image) */}
+            {/* Streak Badge */}
             <View className="w-10 h-10 rounded-full border border-[#E5E7EB] bg-white items-center justify-center">
               <Text className="text-[16px] font-poppins-medium text-text-primary">
                 {streak}
@@ -457,7 +672,7 @@ export default function AiTeacherScreen() {
         {isCameraOn && (
           <View className="absolute top-4 right-4 w-24 h-32 rounded-2xl border-2 border-white overflow-hidden shadow-lg bg-gray-200">
             <Image
-              source={images.studentPreview}
+              source={user?.imageUrl ? { uri: user.imageUrl } : images.studentPreview}
               className="w-full h-full"
               resizeMode="cover"
             />
@@ -485,7 +700,7 @@ export default function AiTeacherScreen() {
                 </Text>
               </View>
 
-              {/* Blue Speaker Icon (no circle border/background, matching base image) */}
+              {/* Blue Speaker Icon */}
               <Pressable
                 onPress={handleSpeakerPress}
                 disabled={isPlayingAudio}
@@ -501,7 +716,7 @@ export default function AiTeacherScreen() {
               </Pressable>
             </View>
 
-            {/* Bubble arrow / pointer (pointing bottom-right, matching base image) */}
+            {/* Bubble arrow / pointer */}
             <View
               className="absolute -bottom-2 right-[15%] w-4 h-4 bg-white rotate-45 border-r border-b border-[#F3F4F6]"
             />
@@ -520,7 +735,7 @@ export default function AiTeacherScreen() {
             <Ionicons name="mic-outline" size={12} color="#FFFFFF" />
           )}
           <Text className="text-[11px] font-poppins-bold text-white uppercase tracking-wider">
-            {sessionStatus}
+            {displayStatusText}
           </Text>
         </View>
 
@@ -681,6 +896,22 @@ export default function AiTeacherScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              {/* User / Student Info */}
+              <View className="bg-[#FAF9FF] border border-[#ECE9FF] rounded-[24px] p-4 mb-4 flex-row items-center gap-3">
+                <Image
+                  source={user?.imageUrl ? { uri: user.imageUrl } : images.studentPreview}
+                  className="w-12 h-12 rounded-full bg-[#E5E7EB]"
+                />
+                <View className="flex-1">
+                  <Text className="text-[15px] font-poppins-bold text-text-primary">
+                    {user?.fullName || user?.username || "Student"}
+                  </Text>
+                  <Text className="text-[12px] font-poppins text-text-secondary">
+                    {user?.emailAddresses[0]?.emailAddress || "Signed in"}
+                  </Text>
+                </View>
+              </View>
+
               {/* Teacher Info Card */}
               <View className="bg-[#FAF9FF] border border-[#ECE9FF] rounded-[24px] p-5 mb-5 flex-row items-center gap-4">
                 <Image
