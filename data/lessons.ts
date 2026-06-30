@@ -1,4 +1,5 @@
 import { Lesson } from "@/types/learning";
+import { images } from "@/constants/images";
 
 export const lessons: Lesson[] = [
   // ==========================================
@@ -474,6 +475,7 @@ export const lessons: Lesson[] = [
     xpReward: 15,
     type: "interactive",
     goals: ["Talk about family relations", "Basic family roles"],
+    image: images.studentPreview,
     activities: [
       {
         id: "es-u3-l6-act1",
@@ -489,6 +491,422 @@ export const lessons: Lesson[] = [
       },
     ],
   },
+
+  // ==========================================
+  // ── JAPANESE LESSONS (ja-unit-1) ───────────
+  // ==========================================
+  {
+    id: "ja-u1-l1",
+    unitId: "ja-unit-1",
+    title: "Japanese Greetings",
+    description: "Learn to say Hello and basic greetings in Japanese.",
+    xpReward: 20,
+    type: "video",
+    goals: ["Learn Konnichiwa", "Learn morning greetings"],
+    image: images.mascotFoxTeacher,
+    activities: [
+      {
+        id: "ja-u1-l1-act1",
+        type: "video_lecture",
+        title: "AI Teacher Greetings",
+        instructions: "Practice saying Konnichiwa with the AI teacher.",
+        vocabularyItems: [
+          { id: "ja-voc-1", word: "こんにちは (Konnichiwa)", meaning: "Hello / Good afternoon" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "ja-u1-l2",
+    unitId: "ja-unit-1",
+    title: "Self Introductions",
+    description: "Introduce yourself to Carlos in Japanese.",
+    xpReward: 25,
+    type: "chat",
+    goals: ["Say your name", "Nice to meet you"],
+    image: images.streakFire,
+    activities: [
+      {
+        id: "ja-u1-l2-act1",
+        type: "ai_tutor_chat",
+        title: "Introduction Chat",
+        instructions: "Introduce your name to the tutor.",
+        phrases: [
+          { id: "ja-phr-1", phrase: "はじめまして (Hajimemashite)", meaning: "Nice to meet you" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "ja-u1-l3",
+    unitId: "ja-unit-1",
+    title: "At the Café",
+    description: "Order Green Tea and Water in Japanese.",
+    xpReward: 15,
+    type: "interactive",
+    goals: ["Order tea", "Learn water vocabulary"],
+    image: images.cafeTable,
+    activities: [
+      {
+        id: "ja-u1-l3-act1",
+        type: "vocabulary_quiz",
+        title: "Drink Quiz",
+        instructions: "What does 'お茶 (Ocha)' mean?",
+        correctAnswer: "Green Tea",
+        multipleChoiceOptions: [
+          { id: "ja-opt-1", text: "Coffee", isCorrect: false },
+          { id: "ja-opt-2", text: "Green Tea", isCorrect: true },
+          { id: "ja-opt-3", text: "Water", isCorrect: false }
+        ]
+      }
+    ]
+  },
+  {
+    id: "ja-u1-l4",
+    unitId: "ja-unit-1",
+    title: "Tokyo Directions",
+    description: "Ask how to find the metro station in Tokyo.",
+    xpReward: 20,
+    type: "video",
+    goals: ["Ask for metro directions"],
+    image: { uri: "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?w=150&auto=format&fit=crop" },
+    activities: [
+      {
+        id: "ja-u1-l4-act1",
+        type: "video_lecture",
+        title: "Metro Directions",
+        instructions: "Listen and repeat the directions."
+      }
+    ]
+  },
+  {
+    id: "ja-u1-l5",
+    unitId: "ja-unit-1",
+    title: "Shopping & Prices",
+    description: "Ask how much items cost in Japanese.",
+    xpReward: 25,
+    type: "chat",
+    goals: ["Ask for prices"],
+    image: images.treasure,
+    activities: [
+      {
+        id: "ja-u1-l5-act1",
+        type: "ai_tutor_chat",
+        title: "Shopping Chat",
+        instructions: "Chat with the merchant."
+      }
+    ]
+  },
+
+  // ==========================================
+  // ── KOREAN LESSONS (ko-unit-1) ─────────────
+  // ==========================================
+  {
+    id: "ko-u1-l1",
+    unitId: "ko-unit-1",
+    title: "Korean Greetings",
+    description: "Learn to say Hello and show politeness in Korean.",
+    xpReward: 20,
+    type: "video",
+    goals: ["Learn Annyeonghaseyo", "Polite bow basics"],
+    image: images.mascotFoxTeacher,
+    activities: [
+      {
+        id: "ko-u1-l1-act1",
+        type: "video_lecture",
+        title: "Korean Teacher Greetings",
+        instructions: "Practice saying Annyeonghaseyo.",
+        vocabularyItems: [
+          { id: "ko-voc-1", word: "안녕하세요 (Annyeonghaseyo)", meaning: "Hello" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "ko-u1-l2",
+    unitId: "ko-unit-1",
+    title: "Introductions",
+    description: "Introduce your name in Korean.",
+    xpReward: 25,
+    type: "chat",
+    goals: ["Say your name", "Ask other's name"],
+    image: images.streakFire,
+    activities: [
+      {
+        id: "ko-u1-l2-act1",
+        type: "ai_tutor_chat",
+        title: "Name Chat",
+        instructions: "Tell Carlos your name in Korean."
+      }
+    ]
+  },
+  {
+    id: "ko-u1-l3",
+    unitId: "ko-unit-1",
+    title: "Korean Food Basics",
+    description: "Learn essential Korean food terms like Kimchi.",
+    xpReward: 15,
+    type: "interactive",
+    goals: ["Identify Korean dishes"],
+    image: images.cafeTable,
+    activities: [
+      {
+        id: "ko-u1-l3-act1",
+        type: "vocabulary_quiz",
+        title: "Food Identification",
+        instructions: "What does '김치 (Kimchi)' mean?",
+        correctAnswer: "Kimchi",
+        multipleChoiceOptions: [
+          { id: "ko-opt-1", text: "Rice", isCorrect: false },
+          { id: "ko-opt-2", text: "Kimchi", isCorrect: true },
+          { id: "ko-opt-3", text: "Tea", isCorrect: false }
+        ]
+      }
+    ]
+  },
+  {
+    id: "ko-u1-l4",
+    unitId: "ko-unit-1",
+    title: "Seoul Directions",
+    description: "Navigate around the streets of Seoul.",
+    xpReward: 20,
+    type: "video",
+    goals: ["Ask where the subway is"],
+    image: { uri: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=150&auto=format&fit=crop" },
+    activities: [
+      {
+        id: "ko-u1-l4-act1",
+        type: "video_lecture",
+        title: "Subway Directions",
+        instructions: "Learn to ask for the subway station."
+      }
+    ]
+  },
+  {
+    id: "ko-u1-l5",
+    unitId: "ko-unit-1",
+    title: "Myeongdong Shopping",
+    description: "Shop for skincare and products in Seoul.",
+    xpReward: 25,
+    type: "chat",
+    goals: ["Inquire about skincare prices"],
+    image: images.treasure,
+    activities: [
+      {
+        id: "ko-u1-l5-act1",
+        type: "ai_tutor_chat",
+        title: "Skincare Shop",
+        instructions: "Practice buying skincare products."
+      }
+    ]
+  },
+
+  // ==========================================
+  // ── GERMAN LESSONS (de-unit-1) ─────────────
+  // ==========================================
+  {
+    id: "de-u1-l1",
+    unitId: "de-unit-1",
+    title: "German Greetings",
+    description: "Learn Hallo, Guten Morgen, and polite greetings in German.",
+    xpReward: 20,
+    type: "video",
+    goals: ["Learn German greetings", "Formal vs Informal"],
+    image: images.mascotFoxTeacher,
+    activities: [
+      {
+        id: "de-u1-l1-act1",
+        type: "video_lecture",
+        title: "German Teacher greetings",
+        instructions: "Practice saying Guten Morgen.",
+        vocabularyItems: [
+          { id: "de-voc-1", word: "Hallo", meaning: "Hello" },
+          { id: "de-voc-2", word: "Guten Tag", meaning: "Good day" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "de-u1-l2",
+    unitId: "de-unit-1",
+    title: "Self Introductions",
+    description: "Introduce your name and hometown in German.",
+    xpReward: 25,
+    type: "chat",
+    goals: ["Say your name", "Say where you live"],
+    image: images.streakFire,
+    activities: [
+      {
+        id: "de-u1-l2-act1",
+        type: "ai_tutor_chat",
+        title: "Introduce Yourself",
+        instructions: "Say 'Ich heiße...' to the tutor."
+      }
+    ]
+  },
+  {
+    id: "de-u1-l3",
+    unitId: "de-unit-1",
+    title: "Essen & Trinken",
+    description: "Order water, beer, and bread in German.",
+    xpReward: 15,
+    type: "interactive",
+    goals: ["Order drinks in German"],
+    image: images.cafeTable,
+    activities: [
+      {
+        id: "de-u1-l3-act1",
+        type: "vocabulary_quiz",
+        title: "Drink Identification",
+        instructions: "What does 'Wasser' mean?",
+        correctAnswer: "Water",
+        multipleChoiceOptions: [
+          { id: "de-opt-1", text: "Beer", isCorrect: false },
+          { id: "de-opt-2", text: "Water", isCorrect: true },
+          { id: "de-opt-3", text: "Milk", isCorrect: false }
+        ]
+      }
+    ]
+  },
+  {
+    id: "de-u1-l4",
+    unitId: "de-unit-1",
+    title: "Berlin Directions",
+    description: "Find your way around Berlin's public transit.",
+    xpReward: 20,
+    type: "video",
+    goals: ["Ask where the U-Bahn is"],
+    image: { uri: "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=150&auto=format&fit=crop" },
+    activities: [
+      {
+        id: "de-u1-l4-act1",
+        type: "video_lecture",
+        title: "U-Bahn Directions",
+        instructions: "Learn to ask 'Wo ist die U-Bahn?'"
+      }
+    ]
+  },
+  {
+    id: "de-u1-l5",
+    unitId: "de-unit-1",
+    title: "Supermarket Shopping",
+    description: "Buy groceries and check prices in German.",
+    xpReward: 25,
+    type: "chat",
+    goals: ["Ask for grocery prices"],
+    image: images.treasure,
+    activities: [
+      {
+        id: "de-u1-l5-act1",
+        type: "ai_tutor_chat",
+        title: "Groceries Chat",
+        instructions: "Shop for bread and apples."
+      }
+    ]
+  },
+
+  // ==========================================
+  // ── CHINESE LESSONS (zh-unit-1) ────────────
+  // ==========================================
+  {
+    id: "zh-u1-l1",
+    unitId: "zh-unit-1",
+    title: "Chinese Greetings",
+    description: "Master basic Ni Hao greetings and Chinese tones.",
+    xpReward: 20,
+    type: "video",
+    goals: ["Say Ni Hao", "Learn basic Chinese tones"],
+    image: images.mascotFoxTeacher,
+    activities: [
+      {
+        id: "zh-u1-l1-act1",
+        type: "video_lecture",
+        title: "Tones Practice",
+        instructions: "Repeat Ni Hao with correct tones.",
+        vocabularyItems: [
+          { id: "zh-voc-1", word: "你好 (Nǐ hǎo)", meaning: "Hello" }
+        ]
+      }
+    ]
+  },
+  {
+    id: "zh-u1-l2",
+    unitId: "zh-unit-1",
+    title: "Introductions",
+    description: "Introduce your name in Chinese.",
+    xpReward: 25,
+    type: "chat",
+    goals: ["Say your Chinese name"],
+    image: images.streakFire,
+    activities: [
+      {
+        id: "zh-u1-l2-act1",
+        type: "ai_tutor_chat",
+        title: "Name Chat",
+        instructions: "Tell the tutor your name using 'Wǒ jiào...'"
+      }
+    ]
+  },
+  {
+    id: "zh-u1-l3",
+    unitId: "zh-unit-1",
+    title: "Food & Chinese Tea",
+    description: "Learn to identify Tea and Rice in Chinese.",
+    xpReward: 15,
+    type: "interactive",
+    goals: ["Learn food vocabulary"],
+    image: images.cafeTable,
+    activities: [
+      {
+        id: "zh-u1-l3-act1",
+        type: "vocabulary_quiz",
+        title: "Tea Quiz",
+        instructions: "What does '茶 (Chá)' mean?",
+        correctAnswer: "Tea",
+        multipleChoiceOptions: [
+          { id: "zh-opt-1", text: "Rice", isCorrect: false },
+          { id: "zh-opt-2", text: "Tea", isCorrect: true },
+          { id: "zh-opt-3", text: "Water", isCorrect: false }
+        ]
+      }
+    ]
+  },
+  {
+    id: "zh-u1-l4",
+    unitId: "zh-unit-1",
+    title: "Beijing Directions",
+    description: "Ask directions to the subway in Beijing.",
+    xpReward: 20,
+    type: "video",
+    goals: ["Ask where the subway station is"],
+    image: { uri: "https://images.unsplash.com/photo-1508672019048-805c876b67e2?w=150&auto=format&fit=crop" },
+    activities: [
+      {
+        id: "zh-u1-l4-act1",
+        type: "video_lecture",
+        title: "Subway Directions",
+        instructions: "Ask 'Wo de ditiezhan zai nali?'"
+      }
+    ]
+  },
+  {
+    id: "zh-u1-l5",
+    unitId: "zh-unit-1",
+    title: "Market Shopping",
+    description: "Shop for tea and fruits in a traditional Chinese market.",
+    xpReward: 25,
+    type: "chat",
+    goals: ["Negotiate prices"],
+    image: images.treasure,
+    activities: [
+      {
+        id: "zh-u1-l5-act1",
+        type: "ai_tutor_chat",
+        title: "Market Chat",
+        instructions: "Ask how much the tea is."
+      }
+    ]
+  }
 ];
 
 /**

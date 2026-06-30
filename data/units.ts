@@ -32,6 +32,42 @@ export const units: Unit[] = [
     title: "First Conversations",
     description: "Get started with fundamental greetings and simple chat-based introductions.",
   },
+
+  // ── Japanese Units ─────────────────────────────────────────
+  {
+    id: "ja-unit-1",
+    languageId: "ja",
+    number: 1,
+    title: "Hiragana & Greetings",
+    description: "Master essential greetings, introduce yourself, and learn basic Hiragana symbols.",
+  },
+
+  // ── Korean Units ───────────────────────────────────────────
+  {
+    id: "ko-unit-1",
+    languageId: "ko",
+    number: 1,
+    title: "Hangul & Greetings",
+    description: "Learn how to read the Hangul alphabet and introduce yourself in Korean.",
+  },
+
+  // ── German Units ───────────────────────────────────────────
+  {
+    id: "de-unit-1",
+    languageId: "de",
+    number: 1,
+    title: "German Basics",
+    description: "Introduce yourself, talk about your hobbies, and greet others in German.",
+  },
+
+  // ── Chinese Units ──────────────────────────────────────────
+  {
+    id: "zh-unit-1",
+    languageId: "zh",
+    number: 1,
+    title: "Pinyin & Greetings",
+    description: "Learn to introduce yourself, count to ten, and greet people in Chinese.",
+  },
 ];
 
 /**

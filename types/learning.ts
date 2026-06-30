@@ -63,6 +63,7 @@ export interface Lesson {
   type: LessonType;
   goals: string[];
   activities: Activity[];
+  image?: any;
 }
 
 export interface Unit {

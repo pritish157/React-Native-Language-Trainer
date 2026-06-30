@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Pressable } from "react-native";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -103,7 +103,7 @@ const TabButton = ({ isActive, onPress, onLongPress, iconName, label }: TabButto
       
       <Animated.Text
         style={animatedLabelStyle}
-        className="absolute bottom-2.5 text-[11px] font-poppins-medium text-[#6B7280]"
+        className="absolute bottom-2.5 left-0 right-0 text-[11px] font-poppins-medium text-[#6B7280] text-center"
       >
         {label}
       </Animated.Text>
@@ -118,6 +118,9 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
   const circleSize = 52;
   const innerHeight = 70;
 
+  // Track the first layout to prevent the indicator from sliding in from the left on mount
+  const isFirstLayout = useRef(true);
+
   // Shared value for sliding active indicator
   const translateX = useSharedValue(0);
 
@@ -125,10 +128,16 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
     if (containerWidth > 0) {
       const tabWidth = containerWidth / state.routes.length;
       const targetX = activeIndex * tabWidth + (tabWidth - circleSize) / 2;
-      translateX.value = withSpring(targetX, {
-        damping: 18,
-        stiffness: 130,
-      });
+      
+      if (isFirstLayout.current) {
+        translateX.value = targetX;
+        isFirstLayout.current = false;
+      } else {
+        translateX.value = withSpring(targetX, {
+          damping: 18,
+          stiffness: 130,
+        });
+      }
     }
   }, [activeIndex, containerWidth, state.routes.length, translateX, circleSize]);
 
@@ -143,8 +152,8 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
       className="flex-row bg-white border-t border-[#E5E7EB] w-full"
       style={{
-        paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
-        height: innerHeight + (insets.bottom > 0 ? insets.bottom : 12),
+        paddingBottom: insets.bottom > 0 ? insets.bottom : 6,
+        height: innerHeight + (insets.bottom > 0 ? insets.bottom : 6),
         shadowColor: "#000",
         shadowOffset: { width: 0, height: -4 },
         shadowOpacity: 0.04,
@@ -162,9 +171,16 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
               height: circleSize,
               borderRadius: circleSize / 2,
               top: (innerHeight - circleSize) / 2,
+              left: 0,
+              // Premium glow shadow for active circular indicator
+              shadowColor: "#6C4EF5",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.35,
+              shadowRadius: 6,
+              elevation: 4,
             },
           ]}
-          className="absolute bg-lingua-purple shadow-md shadow-lingua-purple/35"
+          className="absolute bg-lingua-purple"
         />
       )}
 

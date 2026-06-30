@@ -46,7 +46,7 @@ const conversationData: Record<string, { phrase: string; translation: string }[]
 export default function AudioLessonScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { completeLesson, streak } = useProgressStore();
+  const { completeLesson, addXp, streak } = useProgressStore();
 
   // Load lesson
   const lesson = lessons.find((l) => l.id === id) || lessons[0];
@@ -103,7 +103,8 @@ export default function AudioLessonScreen() {
             {
               text: "Finish",
               onPress: () => {
-                completeLesson(lesson.id, lesson.xpReward);
+                completeLesson(lesson.id);
+                addXp(lesson.xpReward);
                 router.replace("/(tabs)/learn");
               },
             },
@@ -241,7 +242,7 @@ export default function AudioLessonScreen() {
           {/* Waving Mascot Teacher Illustration */}
           <View className="flex-1 justify-center items-center">
             <Image
-              source={images.mascotTeacher}
+              source={images.mascotFoxTeacher}
               className={`w-52 h-52 mt-6 ${teacherSpeaking ? "scale-105" : ""}`}
               resizeMode="contain"
             />
@@ -418,7 +419,7 @@ export default function AudioLessonScreen() {
         <View style={styles.indicatorMock} />
 
         <View className="flex-row h-full">
-          <Pressable onPress={() => handleTabPress("/(tabs)/home")} style={styles.tabItemMock}>
+          <Pressable onPress={() => handleTabPress("/(tabs)/")} style={styles.tabItemMock}>
             <Ionicons name="home-outline" size={24} color="#8B8FA3" />
             <Text className="text-[10px] font-poppins-medium text-[#8B8FA3] mt-1">
               Home

@@ -112,51 +112,24 @@ export default function LearnScreen() {
   const handleLessonPress = (lesson: typeof lessonsWithStatus[0]) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (lesson.status === "locked") {
-      Alert.alert(
-        "Lesson Locked",
-        "Please complete the preceding lessons in your learning path to unlock this lesson."
-      );
-      return;
-    }
+    const isCompleted = lesson.status === "completed";
 
-    if (lesson.status === "completed") {
-      Alert.alert(
-        "Lesson Completed",
-        `You have already completed "${lesson.title}". Would you like to enter the audio practice room to review it?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Review",
-            onPress: () => {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.push({
-                pathname: "/(tabs)/ai-teacher",
-                params: { lessonId: lesson.id },
-              });
-            },
+    Alert.alert(
+      isCompleted ? "Review Lesson" : "Start Lesson",
+      isCompleted
+        ? `Would you like to review "${lesson.title}"?`
+        : `Would you like to start "${lesson.title}"?\nGoal: ${lesson.goals[0] || "Practice speaking"}`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: isCompleted ? "Review" : "Start",
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.push(`/lesson/${lesson.id}`);
           },
-        ]
-      );
-    } else {
-      Alert.alert(
-        "Start Lesson",
-        `Would you like to start "${lesson.title}"?\nGoal: ${lesson.goals[0] || "Practice speaking"}`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Start",
-            onPress: () => {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.push({
-                pathname: "/(tabs)/ai-teacher",
-                params: { lessonId: lesson.id },
-              });
-            },
-          },
-        ]
-      );
-    }
+        },
+      ]
+    );
   };
 
   const handleBookmarkPress = () => {
@@ -306,7 +279,7 @@ export default function LearnScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setActiveTab("lessons");
               }}
-              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+              className={`flex-1 py-3 rounded-xl items-center justify-center relative overflow-hidden ${
                 activeTab === "lessons" ? "bg-white shadow-sm border border-[#ECE9FF]" : ""
               }`}
             >
@@ -319,6 +292,9 @@ export default function LearnScreen() {
               >
                 Lessons
               </Text>
+              {activeTab === "lessons" && (
+                <View className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#6C4EF5] rounded-full" />
+              )}
             </Pressable>
 
             <Pressable
@@ -326,7 +302,7 @@ export default function LearnScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setActiveTab("practice");
               }}
-              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+              className={`flex-1 py-3 rounded-xl items-center justify-center relative overflow-hidden ${
                 activeTab === "practice" ? "bg-white shadow-sm border border-[#ECE9FF]" : ""
               }`}
             >
@@ -339,6 +315,9 @@ export default function LearnScreen() {
               >
                 Practice
               </Text>
+              {activeTab === "practice" && (
+                <View className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#6C4EF5] rounded-full" />
+              )}
             </Pressable>
           </View>
         </View>
@@ -373,6 +352,7 @@ export default function LearnScreen() {
 
               // Render In Progress Card
               if (lesson.status === "in_progress") {
+                const lessonImage = lesson.image || images.cafeTable;
                 return (
                   <Pressable
                     key={lesson.id}
@@ -392,7 +372,7 @@ export default function LearnScreen() {
                       </Text>
                     </View>
                     <Image
-                      source={images.cafeTable}
+                      source={typeof lessonImage === "string" ? { uri: lessonImage } : lessonImage}
                       className="w-12 h-12"
                       resizeMode="contain"
                     />
@@ -416,7 +396,7 @@ export default function LearnScreen() {
                       {lesson.title}
                     </Text>
                     <Text className="text-text-secondary text-[13px] font-poppins mt-1">
-                      0 / {lesson.activities.length} activities
+                      0 / {lesson.activities?.length || 6} lessons
                     </Text>
                   </View>
                   <Ionicons name="lock-closed" size={22} color="#9CA3AF" />
